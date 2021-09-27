@@ -1,5 +1,6 @@
 import java.util.Collection;
-import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class ThingsRecommender implements Recommender {
@@ -15,8 +16,18 @@ public class ThingsRecommender implements Recommender {
      * @param p2 the second person
      */
     public float euclidianDistance(String p1, String p2) {
-    	// TODO implement
-        return 0f;
+        List<String> sharedThings = getThings(p1).stream()
+                .filter(getThings(p2)::contains)
+                .collect(Collectors.toList());
+
+        List<Float> diffSquared = sharedThings.stream().map(thing -> {
+            Float score1 = getScore(p1, thing);
+            Float score2 = getScore(p2, thing);
+
+            return (score1 - score2) * (score1 - score2);
+        }).collect(Collectors.toList());
+
+        return (float) Math.sqrt(diffSquared.stream().reduce(0f, Float::sum));
     }
 
     /**
@@ -25,8 +36,18 @@ public class ThingsRecommender implements Recommender {
      */
     @Override
     public String closestPerson(String person) {
-    	// TODO implement
-        return null;
+        Collection<String> allOtherPersons = getPersons().stream()
+                .filter(p -> !p.equals(person))
+                .collect(Collectors.toSet());
+
+        Optional<String> closestPerson = allOtherPersons.stream().reduce((prev, curr) -> {
+            float prevScore = euclidianDistance(prev, person);
+            float currScore = euclidianDistance(curr, person);
+
+            return currScore < prevScore ? curr : prev;
+        });
+
+        return closestPerson.orElse(null);
     }
 
     /**
@@ -36,8 +57,14 @@ public class ThingsRecommender implements Recommender {
      */
     @Override
     public String recommend(String person) {
-    	// TODO implement
-        return null;
+        String closestPerson = closestPerson(person);
+        Collection<Rating> closestPersonRatings = getRatings(closestPerson);
+
+        Optional<Rating> recommendations = closestPersonRatings.stream()
+                .filter(rating -> !getThings(person).contains(rating.getThing()))
+                .reduce((prev, curr) -> prev.getScore() > curr.getScore() ? prev : curr);
+
+        return recommendations.map(Rating::getThing).orElse(null);
     }
 
     private Collection<Rating> getRatings(String person) {
